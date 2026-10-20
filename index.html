@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Daily Tips</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#14181f;--mu:#6b7280;--ac:#16a34a;--bd:#e5e7eb;--wn:#fef3c7;--wt:#92400e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1318;--card:#181e26;--tx:#eef1f5;--mu:#9aa4b2;--ac:#22c55e;--bd:#262e39;--wn:#3a2f0b;--wt:#fcd34d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 -apple-system,system-ui,Segoe UI,Roboto,sans-serif}
+.w{max-width:640px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0 12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:12px}
+input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-size:16px;margin-bottom:10px}
+.hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-weight:600}
+.hd button{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:8px;width:34px;height:34px;font-size:16px}
+.g{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.dn{color:var(--mu);font-size:12px}
+.d{position:relative;aspect-ratio:1;border:0;border-radius:10px;background:none;color:var(--tx);font-size:14px}
+.d:disabled{opacity:.35}
+.d.t{border:1px solid var(--ac)}
+.d.s{background:var(--ac);color:#fff}
+.d.h::after{content:"";position:absolute;bottom:5px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--ac)}
+.d.s.h::after{background:#fff}
+.btn{width:100%;padding:12px;border:0;border-radius:10px;background:var(--ac);color:#fff;font-size:16px;font-weight:600;margin-bottom:12px}
+.btn:disabled{opacity:.6}
+.lg{font-size:12px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
+.m{cursor:pointer;margin-bottom:8px}
+.tm{font-weight:600}
+.rs{font-size:13px;color:var(--mu);margin-top:4px}
+.tp{margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)}
+.tp b{color:var(--ac)}
+.wn{background:var(--wn);color:var(--wt);border-radius:10px;padding:10px;font-size:13px;margin-bottom:12px}
+.em{text-align:center;color:var(--mu);padding:20px 0}
+.lk{background:none;border:0;color:var(--mu);text-decoration:underline;font-size:13px;padding:0}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>⚽ Daily Tips</h1>
+<div class="card" id="setup" hidden>
+  <div style="font-weight:600;margin-bottom:6px">Paste your API-Football key</div>
+  <input id="key" placeholder="API key" autocomplete="off">
+  <button class="btn" id="sk" style="margin:0">Save key</button>
+  <div class="rs">Stored only on this device. Get a free key at api-football.com.</div>
+</div>
+<input type="search" id="q" placeholder="Search team or league…">
+<div class="card">
+  <div class="hd"><button id="pv">‹</button><span id="mt"></span><button id="nx">›</button></div>
+  <div class="g" id="cal"></div>
+</div>
+<button class="btn" id="go">Load matches</button>
+<div class="wn">Predictions come from API-Football's statistical model, not guarantees. Always confirm odds with your bookmaker. Bet only what you can afford to lose. 18+.</div>
+<div id="out"></div>
+<div style="text-align:center"><button class="lk" id="ck">Change API key</button></div>
+</div>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var MN=["January","February","March","April","May","June","July","August","September","October","November","December"];
+var BASE="https://v3.football.api-sports.io/";
+function ld(k,d){try{return JSON.parse(localStorage.getItem(k)||"null")||d}catch(e){return d}}
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+var key=ld("key",""),fx=ld("fx",{}),pr=ld("pr",{});
+var today=new Date();today.setHours(0,0,0,0);
+var maxD=new Date(today);maxD.setDate(maxD.getDate()+14);
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+var sel=iso(today),view=new Date(today.getFullYear(),today.getMonth(),1),busy=false,err="",limit=60;
+function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML}
+function pretty(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}
+function api(path){
+  return fetch(BASE+path,{headers:{"x-apisports-key":key}}).then(function(r){return r.json()}).then(function(j){
+    var e=j.errors;if(e&&(Array.isArray(e)?e.length:Object.keys(e).length))throw new Error(Array.isArray(e)?e[0]:Object.values(e)[0]);
+    return j.response||[];
+  });
+}
+function cal(){
+  $("mt").textContent=MN[view.getMonth()]+" "+view.getFullYear();
+  var h="";["S","M","T","W","T","F","S"].forEach(function(n){h+='<div class="dn">'+n+'</div>'});
+  var f=view.getDay(),n=new Date(view.getFullYear(),view.getMonth()+1,0).getDate(),i;
+  for(i=0;i<f;i++)h+="<div></div>";
+  for(i=1;i<=n;i++){
+    var d=new Date(view.getFullYear(),view.getMonth(),i),k=iso(d);
+    h+='<button class="d'+(k===iso(today)?" t":"")+(k===sel?" s":"")+(fx[k]?" h":"")+'" data-d="'+k+'"'+(d<today||d>maxD?" disabled":"")+">"+i+"</button>";
+  }
+  $("cal").innerHTML=h;
+}
+function tip(p){
+  if(!p)return"";
+  if(p.err)return '<div class="tp rs">'+esc(p.err)+"</div>";
+  return '<div class="tp"><div>Tip: <b>'+esc(p.advice||"No advice")+"</b></div>"+
+    '<div class="rs">Home '+esc(p.h)+" · Draw "+esc(p.d)+" · Away "+esc(p.a)+"</div></div>";
+}
+function render(){
+  $("setup").hidden=!!key;
+  var q=$("q").value.trim().toLowerCase(),list=[],o="";
+  var days=q?Object.keys(fx).sort():[sel];
+  days.forEach(function(k){(fx[k]||[]).forEach(function(m){
+    if(!q||(m.lg+" "+m.h+" "+m.a+" "+m.c).toLowerCase().indexOf(q)>-1)list.push(m)
+  })});
+  if(!q)o='<div class="lg">'+esc(pretty(sel))+"</div>";
+  if(err)o+='<div class="em">'+esc(err)+"</div>";
+  else if(!q&&!fx[sel])o+='<div class="em">Tap “Load matches” to load this day.</div>';
+  else if(!list.length)o+='<div class="em">No matches found.</div>';
+  var last="";
+  list.slice(0,limit).forEach(function(m){
+    var g=m.c+" · "+m.lg;
+    if(g!==last){o+='<div class="lg">'+esc(g)+"</div>";last=g}
+    o+='<div class="card m" data-id="'+m.id+'"><div class="rs">'+esc(m.t)+'</div><div class="tm">'+esc(m.h)+" vs "+esc(m.a)+"</div>"+tip(pr[m.id])+
+      (pr[m.id]?"":'<div class="rs">Tap for tip</div>')+"</div>";
+  });
+  if(list.length>limit)o+='<button class="btn" id="more">Show more ('+(list.length-limit)+")</button>";
+  $("out").innerHTML=o;
+  $("go").textContent=busy?"Loading…":(fx[sel]?"Refresh matches":"Load matches");
+  $("go").disabled=busy||!key;
+}
+$("cal").addEventListener("click",function(e){
+  var b=e.target.closest("button");if(!b||b.disabled)return;
+  sel=b.getAttribute("data-d");err="";limit=60;$("q").value="";cal();render();
+});
+$("pv").onclick=function(){view=new Date(view.getFullYear(),view.getMonth()-1,1);cal()};
+$("nx").onclick=function(){view=new Date(view.getFullYear(),view.getMonth()+1,1);cal()};
+$("q").addEventListener("input",function(){limit=60;render()});
+$("sk").onclick=function(){var v=$("key").value.trim();if(!v)return;key=v;sv("key",key);$("key").value="";err="";render()};
+$("ck").onclick=function(){key="";sv("key","");render()};
+$("go").onclick=function(){
+  if(busy||!key)return;busy=true;err="";render();
+  api("fixtures?date="+sel).then(function(r){
+    fx[sel]=r.map(function(x){return{id:x.fixture.id,t:new Date(x.fixture.date).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+      lg:x.league.name,c:x.league.country||"",h:x.teams.home.name,a:x.teams.away.name}})
+      .sort(function(a,b){return(a.c+a.lg).localeCompare(b.c+b.lg)||a.t.localeCompare(b.t)});
+    sv("fx",fx);
+  }).catch(function(e){err="Couldn't load: "+(e.message||"check your key and connection")})
+  .then(function(){busy=false;cal();render()});
+};
+$("out").addEventListener("click",function(e){
+  if(e.target.id==="more"){limit+=60;render();return}
+  var c=e.target.closest(".m");if(!c||!key)return;
+  var id=c.getAttribute("data-id");if(pr[id]&&!pr[id].err)return;
+  pr[id]={err:"Loading tip…"};render();
+  api("predictions?fixture="+id).then(function(r){
+    var p=r[0]&&r[0].predictions;
+    pr[id]=p?{advice:p.advice,h:p.percent&&p.percent.home,d:p.percent&&p.percent.draw,a:p.percent&&p.percent.away}:{err:"No prediction available for this match."};
+    sv("pr",pr);
+  }).catch(function(e){pr[id]={err:"Couldn't load tip: "+(e.message||"error")}}).then(render);
+});
+cal();render();
+})();
+</script>
+</body>
+</html>
